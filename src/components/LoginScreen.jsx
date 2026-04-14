@@ -99,7 +99,10 @@ export default function LoginScreen({ onSignIn, onSignUp }) {
             ))}
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <form
+            onSubmit={e => { e.preventDefault(); handleSubmit(); }}
+            style={{ display: "flex", flexDirection: "column", gap: 12 }}
+          >
             {/* Email */}
             <div style={{ position: "relative" }}>
               <Mail size={16} color={C.faint} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
@@ -108,8 +111,8 @@ export default function LoginScreen({ onSignIn, onSignUp }) {
                 placeholder="ton@email.com"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && handleSubmit()}
                 style={inputStyle}
+                autoComplete="email"
               />
             </div>
 
@@ -121,8 +124,8 @@ export default function LoginScreen({ onSignIn, onSignUp }) {
                 placeholder="Mot de passe"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && handleSubmit()}
                 style={inputStyle}
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
               />
             </div>
 
@@ -154,7 +157,7 @@ export default function LoginScreen({ onSignIn, onSignUp }) {
 
             {/* Bouton */}
             <button
-              onClick={handleSubmit}
+              type="submit"
               disabled={loading}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
@@ -170,7 +173,7 @@ export default function LoginScreen({ onSignIn, onSignUp }) {
                 : <><UserPlus size={16} /> Créer le compte</>
               }
             </button>
-          </div>
+          </form>
         </div>
 
         <div style={{ textAlign: "center", fontSize: 12, color: C.faint }}>
