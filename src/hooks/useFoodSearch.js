@@ -19,7 +19,8 @@ export function useFoodSearch() {
       setLoading(true);
       setError(null);
       try {
-        const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=10&fields=code,product_name,brands,nutriments&lc=fr&cc=fr`;
+        // API v2 = CORS activé (l'ancien endpoint CGI est bloqué en production)
+        const url = `https://world.openfoodfacts.org/api/v2/search?search_terms=${encodeURIComponent(query)}&page_size=10&fields=code,product_name,brands,nutriments&lc=fr&cc=fr`;
         const res  = await fetch(url, { signal: controller.signal });
         const data = await res.json();
 
