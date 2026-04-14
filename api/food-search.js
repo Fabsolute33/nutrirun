@@ -1,47 +1,10 @@
-// Edge Function Vercel → FatSecret API v5
+// Edge Function Vercel → Open Food Facts proxy (pas de restriction IP, pas d'auth)
 export const config = { runtime: "edge" };
-
-const TOKEN_URL  = "https://oauth.fatsecret.com/connect/token";
-const SEARCH_URL = "https://platform.fatsecret.com/rest/foods/search/v5";
 
 const HEADERS = {
   "Content-Type": "application/json",
   "Access-Control-Allow-Origin": "*",
 };
-
-async function getAccessToken(clientId, clientSecret) {
-  const credentials = btoa(`${clientId}:${clientSecret}`);
-  const res = await fetch(TOKEN_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type":  "application/x-www-form-urlencoded",
-      "Authorization": `Basic ${credentials}`,
-    },
-    body: "grant_type=client_credentials&scope=basic",
-  });
-  const raw = await res.text();
-  if (!res.ok) throw new Error(`TOKEN_FAIL ${res.status}: ${raw}`);
-  return JSON.parse(raw).access_token;
-}
-
-function getKcalPer100g(servings) {
-  if (!servings) return null;
-  const list = Array.isArray(servings) ? servings : [servings];
-  for (const s of list) {
-    const unit   = (s.metric_serving_unit || "").toLowerCase();
-    const amount = parseFloat(s.metric_serving_amount);
-    const kcal   = parseFloat(s.calories);
-    if (unit === "g" && amount > 0 && !isNaN(kcal)) {
-      return Math.round((kcal / amount) * 100);
-    }
-  }
-  // fallback : première portion disponible
-  const first = list[0];
-  if (first && !isNaN(parseFloat(first.calories))) {
-    return Math.round(parseFloat(first.calories));
-  }
-  return null;
-}
 
 export default async function handler(req) {
   if (req.method === "OPTIONS") {
@@ -55,46 +18,42 @@ export default async function handler(req) {
     return new Response(JSON.stringify({ products: [] }), { status: 400, headers: HEADERS });
   }
 
-  const clientId     = process.env.FATSECRET_CLIENT_ID;
-  const clientSecret = process.env.FATSECRET_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
-    return new Response(
-      JSON.stringify({ products: [], error: "ENV_MISSING: FATSECRET_CLIENT_ID or FATSECRET_CLIENT_SECRET not set" }),
-      { status: 500, headers: HEADERS }
-    );
-  }
-
   try {
-    const token = await getAccessToken(clientId, clientSecret);
+    const url =
+      "https://world.openfoodfacts.org/api/v2/search" +
+      `?search_terms=${encodeURIComponent(q)}` +
+      "&page_size=15" +
+      "&fields=code,product_name,brands,nutriments" +
+      "&sort_by=unique_scans_n";
 
-    const url = `${SEARCH_URL}?search_expression=${encodeURIComponent(q)}&format=json&max_results=10&page_number=0`;
-    const res  = await fetch(url, {
-      headers: { "Authorization": `Bearer ${token}` },
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "NutriRun/1.0 (contact@nutrirun.app)",
+        "Accept": "application/json",
+      },
     });
 
-    const raw  = await res.text();
-    if (!res.ok) throw new Error(`SEARCH_FAIL ${res.status}: ${raw}`);
+    if (!res.ok) throw new Error(`OFF ${res.status}`);
 
-    const data = JSON.parse(raw);
-    const rawFoods = data?.foods?.food ?? [];
-    const foods    = Array.isArray(rawFoods) ? rawFoods : [rawFoods];
+    const data = await res.json();
 
-    const products = foods
-      .map((f, i) => {
-        const kcalPer100g = getKcalPer100g(f.servings?.serving);
-        if (!kcalPer100g) return null;
+    const products = (data.products || [])
+      .map((p, i) => {
+        const kcal = p.nutriments?.["energy-kcal_100g"];
+        if (kcal == null || !p.product_name) return null;
         return {
-          id:    String(f.food_id || i),
-          name:  f.food_name?.trim() || "",
-          brand: f.brand_name?.trim() || "",
-          kcalPer100g,
+          id:          p.code || String(i),
+          name:        p.product_name.trim(),
+          brand:       p.brands?.split(",")[0]?.trim() || "",
+          kcalPer100g: Math.round(kcal),
         };
       })
       .filter(Boolean);
 
-    return new Response(JSON.stringify({ products }), { status: 200, headers: HEADERS });
-
+    return new Response(JSON.stringify({ products }), {
+      status: 200,
+      headers: { ...HEADERS, "Cache-Control": "no-store" },
+    });
   } catch (err) {
     return new Response(
       JSON.stringify({ products: [], error: err.message }),

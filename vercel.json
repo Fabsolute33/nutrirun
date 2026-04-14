@@ -1,7 +1,1 @@
-{
-  "functions": {
-    "api/food-search.js": {
-      "regions": ["cdg1"]
-    }
-  }
-}
+{}
