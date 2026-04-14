@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabase";
-import { defaultDay } from "../utils";
+import { defaultDay, migrateRepas } from "../utils";
 
 export function useDay(userId, dayKey) {
   const [data, setData] = useState(defaultDay());
@@ -18,7 +18,7 @@ export function useDay(userId, dayKey) {
           setData({
             seanceType:    row.seance_type,
             kcalDepensees: row.kcal_depensees ?? "",
-            repas:         row.repas ?? ["", "", "", "", ""],
+            repas:         migrateRepas(row.repas ?? [[], [], [], [], []]),
           });
         } else {
           setData(defaultDay());

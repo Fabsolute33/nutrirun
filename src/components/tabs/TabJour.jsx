@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
 import { C, MEAL_TARGETS } from "../../constants";
 import { useDay } from "../../hooks/useDay";
-import { calcMaintenance, toKey, fmtDateFull } from "../../utils";
+import { calcMaintenance, calcSlotKcal, toKey, fmtDateFull } from "../../utils";
 import Card from "../ui/Card";
 import SectionLabel from "../ui/SectionLabel";
 import SeanceSelector from "../jour/SeanceSelector";
@@ -30,7 +30,7 @@ export default function TabJour({ profil, userId }) {
 
   const targets     = data.seanceType ? MEAL_TARGETS[data.seanceType] : null;
   const cible       = targets ? targets.reduce((a, b) => a + b, 0) : null;
-  const consomme    = data.repas.reduce((sum, v) => sum + (Number(v) || 0), 0);
+  const consomme    = data.repas.reduce((sum, slot) => sum + calcSlotKcal(slot), 0);
   const maintenance = calcMaintenance(profil, data.kcalDepensees);
   const deficit     = maintenance !== null && consomme > 0 ? maintenance - consomme : null;
 

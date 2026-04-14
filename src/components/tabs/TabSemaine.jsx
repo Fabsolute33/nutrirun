@@ -2,7 +2,7 @@ import { useState } from "react";
 import { BarChart2, TrendingDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { C, DAY_LABELS, SEANCE_CONFIG } from "../../constants";
 import { useWeek } from "../../hooks/useWeek";
-import { calcMaintenance, toKey, fmtDef, getDefColor, fmtDateShort } from "../../utils";
+import { calcMaintenance, calcSlotKcal, toKey, fmtDef, getDefColor, fmtDateShort } from "../../utils";
 import Card from "../ui/Card";
 import SectionLabel from "../ui/SectionLabel";
 
@@ -14,7 +14,7 @@ export default function TabSemaine({ profil, userId }) {
     const key  = toKey(d);
     const data = weekData[key] || null;
     const maintenance = data ? calcMaintenance(profil, data.kcalDepensees) : null;
-    const consomme    = data ? data.repas.reduce((sum, v) => sum + (Number(v) || 0), 0) : 0;
+    const consomme    = data ? data.repas.reduce((sum, slot) => sum + calcSlotKcal(slot), 0) : 0;
     const deficit     = maintenance !== null && consomme > 0 ? maintenance - consomme : null;
     return { key, label: DAY_LABELS[i], date: d, data, maintenance, consomme, deficit };
   });

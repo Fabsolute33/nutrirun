@@ -31,12 +31,29 @@ export function getWeekDays(ref = new Date()) {
   });
 }
 
+// repas[i] est désormais un tableau d'items : [{ name, kcalPer100g, qty, kcal }]
 export function defaultDay() {
-  return { seanceType: null, kcalDepensees: "", repas: ["", "", "", "", ""] };
+  return { seanceType: null, kcalDepensees: "", repas: [[], [], [], [], []] };
 }
 
 export function defaultProfil() {
   return { poids: "", taille: "", age: "", sexe: "m" };
+}
+
+// Calcule le total kcal d'un slot (tableau d'items)
+export function calcSlotKcal(items) {
+  if (!Array.isArray(items)) return Number(items) || 0; // compat ancien format string
+  return items.reduce((sum, item) => sum + (item.kcal || 0), 0);
+}
+
+// Migre l'ancien format string → nouveau format tableau d'items
+export function migrateRepas(repas) {
+  if (!Array.isArray(repas)) return [[], [], [], [], []];
+  return repas.map(slot => {
+    if (Array.isArray(slot)) return slot;
+    const kcal = Number(slot) || 0;
+    return kcal > 0 ? [{ name: "Saisie manuelle", kcalPer100g: null, qty: null, kcal }] : [];
+  });
 }
 
 // déficit > 0 = mangé MOINS = BON = vert → "-XXX"
