@@ -5,17 +5,20 @@ const TOKEN_URL = "https://oauth.fatsecret.com/connect/token";
 const SEARCH_URL = "https://platform.fatsecret.com/rest/foods/search/v5";
 
 async function getAccessToken(clientId, clientSecret) {
+  // Docs FatSecret : Basic auth header + grant_type/scope en body uniquement
+  const credentials = btoa(`${clientId}:${clientSecret}`);
   const body = new URLSearchParams({
-    grant_type:    "client_credentials",
-    client_id:     clientId,
-    client_secret: clientSecret,
-    scope:         "basic",
+    grant_type: "client_credentials",
+    scope:      "basic",
   });
 
   const res = await fetch(TOKEN_URL, {
     method:  "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body:    body.toString(),
+    headers: {
+      "Content-Type":  "application/x-www-form-urlencoded",
+      "Authorization": `Basic ${credentials}`,
+    },
+    body: body.toString(),
   });
 
   if (!res.ok) {
