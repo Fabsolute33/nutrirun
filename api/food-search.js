@@ -93,7 +93,14 @@ export default async function handler(req) {
       })
       .filter(Boolean);
 
-    return new Response(JSON.stringify({ products }), { status: 200, headers: HEADERS });
+    // DEBUG temporaire — à retirer après diagnostic
+    const debug = {
+      rawFoodsCount: foods.length,
+      firstFood: foods[0] ?? null,
+      dataKeys: Object.keys(data ?? {}),
+    };
+
+    return new Response(JSON.stringify({ products, debug }), { status: 200, headers: HEADERS });
 
   } catch (err) {
     return new Response(
