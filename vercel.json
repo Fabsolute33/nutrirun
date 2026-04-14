@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/food-search.js": {
+      "runtime": "nodejs20.x"
+    }
+  }
+}
