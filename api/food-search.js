@@ -1,9 +1,39 @@
-// Edge Function Vercel → Open Food Facts proxy
-// Runtime "edge" = Web Platform APIs (fetch natif garanti, pas de Node.js)
+// Edge Function Vercel → FatSecret API proxy
+// OAuth2 Client Credentials + recherche aliments
 export const config = { runtime: "edge" };
 
+const TOKEN_URL = "https://oauth.fatsecret.com/connect/token";
+const API_URL   = "https://platform.fatsecret.com/rest/server.api";
+
+async function getAccessToken(clientId, clientSecret) {
+  const body = new URLSearchParams({
+    grant_type: "client_credentials",
+    scope: "basic",
+  });
+
+  const credentials = btoa(`${clientId}:${clientSecret}`);
+
+  const res = await fetch(TOKEN_URL, {
+    method: "POST",
+    headers: {
+      "Authorization": `Basic ${credentials}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: body.toString(),
+  });
+
+  if (!res.ok) throw new Error(`Token error: ${res.status}`);
+  const data = await res.json();
+  return data.access_token;
+}
+
+function parseKcal(description) {
+  // description : "Per 100g - Calories: 89kcal | Fat: 0.33g | ..."
+  const match = description?.match(/Calories:\s*([\d.]+)kcal/i);
+  return match ? Math.round(parseFloat(match[1])) : null;
+}
+
 export default async function handler(req) {
-  // Preflight CORS
   if (req.method === "OPTIONS") {
     return new Response(null, {
       status: 200,
@@ -21,23 +51,46 @@ export default async function handler(req) {
     });
   }
 
-  const offUrl =
-    "https://world.openfoodfacts.org/api/v2/search" +
-    `?search_terms=${encodeURIComponent(q.trim())}` +
-    "&page_size=10" +
-    "&fields=code,product_name,brands,nutriments";
+  const clientId     = process.env.FATSECRET_CLIENT_ID;
+  const clientSecret = process.env.FATSECRET_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    return new Response(JSON.stringify({ products: [], error: "API non configurée" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
 
   try {
-    const res = await fetch(offUrl, {
-      headers: {
-        "User-Agent": "NutriRun/1.0 (contact@nutrirun.app)",
-        "Accept": "application/json",
-      },
+    const token = await getAccessToken(clientId, clientSecret);
+
+    const url = `${API_URL}?method=foods.search&search_expression=${encodeURIComponent(q.trim())}&format=json&max_results=10`;
+
+    const res = await fetch(url, {
+      headers: { "Authorization": `Bearer ${token}` },
     });
+
+    if (!res.ok) throw new Error(`FatSecret ${res.status}`);
 
     const data = await res.json();
 
-    return new Response(JSON.stringify(data), {
+    const rawFoods = data?.foods?.food ?? [];
+    const foods = Array.isArray(rawFoods) ? rawFoods : [rawFoods];
+
+    const products = foods
+      .map((f, i) => {
+        const kcal = parseKcal(f.food_description);
+        if (kcal === null) return null;
+        return {
+          id:          f.food_id || String(i),
+          name:        f.food_name?.trim() || "",
+          brand:       f.brand_name?.trim() || "",
+          kcalPer100g: kcal,
+        };
+      })
+      .filter(Boolean);
+
+    return new Response(JSON.stringify({ products }), {
       status: 200,
       headers: {
         "Content-Type": "application/json",
@@ -46,7 +99,7 @@ export default async function handler(req) {
       },
     });
   } catch (err) {
-    return new Response(JSON.stringify({ products: [], error: "Recherche indisponible" }), {
+    return new Response(JSON.stringify({ products: [], error: err.message }), {
       status: 500,
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
