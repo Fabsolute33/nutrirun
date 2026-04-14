@@ -22,7 +22,7 @@ export function useWeights(userId) {
 
     const { error } = await supabase
       .from("weights")
-      .upsert({ user_id: userId, date, value: val });
+      .upsert({ user_id: userId, date, value: val }, { onConflict: "user_id,date" });
 
     if (!error) {
       const updated = entries.filter(e => e.date !== date);

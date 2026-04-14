@@ -31,12 +31,12 @@ export function useDay(userId, dayKey) {
     setData(prev => {
       const updated = updater(prev);
       supabase.from("days").upsert({
-        user_id:       userId,
-        date:          dayKey,
-        seance_type:   updated.seanceType,
+        user_id:        userId,
+        date:           dayKey,
+        seance_type:    updated.seanceType,
         kcal_depensees: Number(updated.kcalDepensees) || 0,
-        repas:         updated.repas,
-      }).then(() => {});
+        repas:          updated.repas,
+      }, { onConflict: "user_id,date" }).then(() => {});
       return updated;
     });
   }, [userId, dayKey]);
