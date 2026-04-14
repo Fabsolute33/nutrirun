@@ -36,7 +36,7 @@ export function useDay(userId, dayKey) {
         seance_type:    updated.seanceType,
         kcal_depensees: Number(updated.kcalDepensees) || 0,
         repas:          updated.repas,
-      }, { onConflict: "user_id,date" }).then(() => {});
+      }).then(() => {});
       return updated;
     });
   }, [userId, dayKey]);
