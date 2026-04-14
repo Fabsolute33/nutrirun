@@ -1,16 +1,22 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Search, X, ChevronLeft, Plus, Pencil, Loader } from "lucide-react";
+import { Search, X, ChevronLeft, Plus, Pencil, Loader, ScanBarcode } from "lucide-react";
 import { C } from "../../constants";
 import { useFoodSearch } from "../../hooks/useFoodSearch";
 
 export default function FoodSearchModal({ isOpen, mealName, onAdd, onClose }) {
   const { query, setQuery, results, loading, error, reset } = useFoodSearch();
-  const [view, setView]             = useState("search"); // "search" | "qty" | "manual"
+  const [view, setView]             = useState("search"); // "search" | "qty" | "manual" | "scanner"
   const [selected, setSelected]     = useState(null);
   const [qty, setQty]               = useState("100");
   const [manualKcal, setManualKcal] = useState("");
   const [visible, setVisible]       = useState(false);
+
+  // Scanner
+  const videoRef                          = useRef(null);
+  const readerRef                         = useRef(null);
+  const [scanError, setScanError]         = useState("");
+  const [scanLoading, setScanLoading]     = useState(false);
 
   // Reset + animation à chaque ouverture
   useEffect(() => {
@@ -20,12 +26,68 @@ export default function FoodSearchModal({ isOpen, mealName, onAdd, onClose }) {
       setSelected(null);
       setQty("100");
       setManualKcal("");
+      setScanError("");
       const t = setTimeout(() => setVisible(true), 10);
       return () => clearTimeout(t);
     } else {
       setVisible(false);
+      stopScanner();
     }
   }, [isOpen]);
+
+  // Démarre le scanner caméra
+  const startScanner = async () => {
+    setScanError("");
+    setScanLoading(true);
+    setView("scanner");
+
+    try {
+      const { BrowserMultiFormatReader } = await import("@zxing/browser");
+      const reader = new BrowserMultiFormatReader();
+      readerRef.current = reader;
+
+      // Attend que le DOM affiche la vidéo
+      await new Promise(r => setTimeout(r, 150));
+
+      if (!videoRef.current) { setScanLoading(false); return; }
+
+      await reader.decodeFromVideoDevice(undefined, videoRef.current, async (result, err) => {
+        if (!result) return;
+        const code = result.getText();
+        stopScanner();
+        setScanLoading(true);
+
+        try {
+          const res  = await fetch(`/api/barcode?code=${encodeURIComponent(code)}`);
+          const data = await res.json();
+          if (data.product) {
+            setSelected(data.product);
+            setQty("100");
+            setView("qty");
+          } else {
+            setScanError(`Produit introuvable (${code})`);
+            setView("search");
+          }
+        } catch {
+          setScanError("Erreur lors de la recherche du produit.");
+          setView("search");
+        } finally {
+          setScanLoading(false);
+        }
+      });
+
+      setScanLoading(false);
+    } catch (e) {
+      setScanError("Caméra indisponible ou accès refusé.");
+      setView("search");
+      setScanLoading(false);
+    }
+  };
+
+  const stopScanner = () => {
+    try { readerRef.current?.reset(); } catch {}
+    readerRef.current = null;
+  };
 
   const preview = selected
     ? Math.round(selected.kcalPer100g * (Number(qty) || 0) / 100)
@@ -50,21 +112,23 @@ export default function FoodSearchModal({ isOpen, mealName, onAdd, onClose }) {
     onClose();
   };
 
+  const handleBack = () => {
+    if (view === "scanner") stopScanner();
+    setView("search");
+  };
+
   if (!isOpen) return null;
 
   return createPortal(
     <div>
       {/* Backdrop */}
-      <div
-        onClick={onClose}
-        style={{
-          position: "fixed", inset: 0,
-          background: "rgba(0,0,0,0.45)",
-          zIndex: 1000,
-          opacity: visible ? 1 : 0,
-          transition: "opacity 0.28s ease",
-        }}
-      />
+      <div onClick={onClose} style={{
+        position: "fixed", inset: 0,
+        background: "rgba(0,0,0,0.45)",
+        zIndex: 1000,
+        opacity: visible ? 1 : 0,
+        transition: "opacity 0.28s ease",
+      }} />
 
       {/* Bottom sheet */}
       <div style={{
@@ -93,7 +157,7 @@ export default function FoodSearchModal({ isOpen, mealName, onAdd, onClose }) {
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {view !== "search" && (
-              <button onClick={() => setView("search")} style={{
+              <button onClick={handleBack} style={{
                 background: "none", border: "none", cursor: "pointer",
                 color: C.muted, padding: 4, display: "flex",
               }}>
@@ -103,6 +167,7 @@ export default function FoodSearchModal({ isOpen, mealName, onAdd, onClose }) {
             <div>
               <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>
                 {view === "search"  && `Ajouter à — ${mealName}`}
+                {view === "scanner" && "Scanner un code-barres"}
                 {view === "qty"     && selected?.name}
                 {view === "manual"  && "Saisie manuelle"}
               </div>
@@ -125,36 +190,67 @@ export default function FoodSearchModal({ isOpen, mealName, onAdd, onClose }) {
           {/* ── VUE RECHERCHE ── */}
           {view === "search" && (
             <>
-              {/* Input recherche */}
-              <div style={{
-                display: "flex", alignItems: "center", gap: 10,
-                background: C.bg, border: `1px solid ${C.border}`,
-                borderRadius: 12, padding: "10px 14px", marginBottom: 12,
-              }}>
-                <Search size={16} color={C.faint} />
-                <input
-                  autoFocus
-                  inputMode="search"
-                  placeholder="Rechercher un aliment..."
-                  value={query}
-                  onChange={e => setQuery(e.target.value)}
+              {/* Input recherche + bouton scan */}
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                <div style={{
+                  flex: 1, display: "flex", alignItems: "center", gap: 10,
+                  background: C.bg, border: `1px solid ${C.border}`,
+                  borderRadius: 12, padding: "10px 14px",
+                }}>
+                  <Search size={16} color={C.faint} />
+                  <input
+                    autoFocus
+                    inputMode="search"
+                    placeholder="Rechercher un aliment..."
+                    value={query}
+                    onChange={e => setQuery(e.target.value)}
+                    style={{
+                      flex: 1, border: "none", background: "transparent",
+                      fontSize: 15, color: C.text, outline: "none",
+                    }}
+                  />
+                  {loading && <Loader size={16} color={C.faint} />}
+                  {query && !loading && (
+                    <button onClick={() => setQuery("")} style={{
+                      background: "none", border: "none", cursor: "pointer",
+                      color: C.faint, padding: 0, display: "flex",
+                    }}>
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Bouton scanner */}
+                <button
+                  onClick={startScanner}
+                  title="Scanner un code-barres"
                   style={{
-                    flex: 1, border: "none", background: "transparent",
-                    fontSize: 15, color: C.text, outline: "none",
+                    flexShrink: 0,
+                    width: 46, height: 46,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    background: C.accentBg, border: `1px solid ${C.accentBorder}`,
+                    borderRadius: 12, cursor: "pointer",
                   }}
-                />
-                {loading && <Loader size={16} color={C.faint} />}
-                {query && !loading && (
-                  <button onClick={() => setQuery("")} style={{
-                    background: "none", border: "none", cursor: "pointer",
-                    color: C.faint, padding: 0, display: "flex",
-                  }}>
-                    <X size={16} />
-                  </button>
-                )}
+                >
+                  {scanLoading
+                    ? <Loader size={18} color={C.accent} />
+                    : <ScanBarcode size={20} color={C.accent} />
+                  }
+                </button>
               </div>
 
-              {/* Erreur */}
+              {/* Erreur scan */}
+              {scanError && (
+                <div style={{
+                  fontSize: 13, color: C.danger, textAlign: "center",
+                  padding: "8px 12px", marginBottom: 8,
+                  background: "#FEF2F2", borderRadius: 8,
+                }}>
+                  {scanError}
+                </div>
+              )}
+
+              {/* Erreur recherche */}
               {error && (
                 <div style={{ fontSize: 13, color: C.danger, textAlign: "center", padding: "12px 0" }}>
                   {error}
@@ -231,10 +327,50 @@ export default function FoodSearchModal({ isOpen, mealName, onAdd, onClose }) {
             </>
           )}
 
+          {/* ── VUE SCANNER ── */}
+          {view === "scanner" && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+              <div style={{
+                position: "relative", width: "100%", borderRadius: 16,
+                overflow: "hidden", background: "#000",
+                aspectRatio: "4/3",
+              }}>
+                <video
+                  ref={videoRef}
+                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                  autoPlay
+                  muted
+                  playsInline
+                />
+                {/* Viseur */}
+                <div style={{
+                  position: "absolute", inset: 0,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  pointerEvents: "none",
+                }}>
+                  <div style={{
+                    width: "70%", height: 80,
+                    border: `2px solid ${C.accent}`,
+                    borderRadius: 8,
+                    boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)",
+                  }} />
+                </div>
+              </div>
+              <div style={{ fontSize: 13, color: C.muted, textAlign: "center" }}>
+                Placez le code-barres dans le cadre vert
+              </div>
+              {scanLoading && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, color: C.accent, fontSize: 13 }}>
+                  <Loader size={16} color={C.accent} />
+                  Recherche du produit...
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ── VUE QUANTITÉ ── */}
           {view === "qty" && selected && (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {/* Input grammes */}
               <div>
                 <div style={{ fontSize: 12, color: C.muted, marginBottom: 6 }}>Quantité (grammes)</div>
                 <div style={{
@@ -258,7 +394,6 @@ export default function FoodSearchModal({ isOpen, mealName, onAdd, onClose }) {
                 </div>
               </div>
 
-              {/* Preview kcal */}
               <div style={{
                 padding: "14px 16px",
                 background: preview > 0 ? C.accentBg : C.bg,
@@ -271,7 +406,6 @@ export default function FoodSearchModal({ isOpen, mealName, onAdd, onClose }) {
                 <div style={{ fontSize: 12, color: C.muted }}>kcal calculés</div>
               </div>
 
-              {/* Bouton ajouter */}
               <button
                 onClick={handleAddQty}
                 disabled={preview <= 0}
