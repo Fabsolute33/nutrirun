@@ -19,12 +19,12 @@ export default async function handler(req) {
   }
 
   try {
+    // search.openfoodfacts.org = backend Elasticsearch, plus fiable que /api/v2/search
     const url =
-      "https://world.openfoodfacts.org/api/v2/search" +
-      `?search_terms=${encodeURIComponent(q)}` +
+      "https://search.openfoodfacts.org/search" +
+      `?q=${encodeURIComponent(q)}` +
       "&page_size=15" +
-      "&fields=code,product_name,brands,nutriments" +
-      "&sort_by=unique_scans_n";
+      "&fields=code,product_name,brands,nutriments";
 
     const res = await fetch(url, {
       headers: {
@@ -37,7 +37,8 @@ export default async function handler(req) {
 
     const data = await res.json();
 
-    const products = (data.products || [])
+    // search.openfoodfacts.org retourne { hits: [...] } au lieu de { products: [...] }
+    const products = (data.hits || data.products || [])
       .map((p, i) => {
         const kcal = p.nutriments?.["energy-kcal_100g"];
         if (kcal == null || !p.product_name) return null;
