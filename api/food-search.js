@@ -28,9 +28,18 @@ async function getAccessToken(clientId, clientSecret) {
 }
 
 function parseKcal(description) {
-  // description : "Per 100g - Calories: 89kcal | Fat: 0.33g | ..."
-  const match = description?.match(/Calories:\s*([\d.]+)kcal/i);
-  return match ? Math.round(parseFloat(match[1])) : null;
+  if (!description) return null;
+  // Exemples FatSecret :
+  //  "Per 100g - Calories: 541kcal | Fat: 30.90g | ..."
+  //  "Per 15g - Calories: 82kcal | Fat: 4.60g | ..."   ← portion, on ramène à 100g
+  const servingMatch = description.match(/Per\s+([\d.]+)\s*g/i);
+  const servingG = servingMatch ? parseFloat(servingMatch[1]) : 100;
+
+  const calMatch = description.match(/Calories:\s*([\d.]+)\s*kcal/i);
+  if (!calMatch) return null;
+
+  const kcal = parseFloat(calMatch[1]);
+  return Math.round((kcal / servingG) * 100);
 }
 
 export default async function handler(req) {
