@@ -45,7 +45,7 @@ export default async function handler(req) {
         return {
           id:          p.code || String(i),
           name:        p.product_name.trim(),
-          brand:       p.brands?.split(",")[0]?.trim() || "",
+          brand:       (Array.isArray(p.brands) ? p.brands[0] : p.brands?.split(",")[0])?.trim() || "",
           kcalPer100g: Math.round(kcal),
         };
       })
