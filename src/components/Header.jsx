@@ -1,4 +1,4 @@
-import { LogOut } from "lucide-react";
+import { PersonStanding, LogOut } from "lucide-react";
 import { C } from "../constants";
 import { calcBMR } from "../utils";
 
@@ -14,8 +14,16 @@ export default function Header({ profil, onSignOut }) {
       background: C.surface,
       borderBottom: `1px solid ${C.border}`,
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <img src="/logo.svg" alt="NutriRun" width={36} height={36} style={{ borderRadius: 10 }} />
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{
+          background: C.accentBg,
+          border: `1px solid ${C.accentBorder}`,
+          borderRadius: 10,
+          width: 34, height: 34,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <PersonStanding size={20} color={C.accent} />
+        </div>
         <span style={{ fontSize: 18, fontWeight: 900, color: C.text, letterSpacing: "-0.02em" }}>
           NutriRun
         </span>
