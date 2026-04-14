@@ -24,14 +24,8 @@ export function useFoodSearch() {
         const res  = await fetch(url, { signal: controller.signal });
         const data = await res.json();
 
-        const parsed = (data.products || [])
-          .filter(p => p.nutriments?.["energy-kcal_100g"] != null && p.product_name)
-          .map((p, i) => ({
-            id:          p.code || String(i),
-            name:        p.product_name.trim(),
-            brand:       p.brands?.split(",")[0]?.trim() || "",
-            kcalPer100g: Math.round(p.nutriments["energy-kcal_100g"]),
-          }));
+        // Le proxy retourne déjà { products: [{ id, name, brand, kcalPer100g }] }
+        const parsed = (data.products || []).filter(p => p.kcalPer100g > 0 && p.name);
 
         setResults(parsed);
       } catch (e) {
