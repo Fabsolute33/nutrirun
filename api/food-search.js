@@ -98,6 +98,7 @@ export default async function handler(req) {
       rawFoodsCount: foods.length,
       firstFood: foods[0] ?? null,
       dataKeys: Object.keys(data ?? {}),
+      fatSecretError: data?.error ?? null,
     };
 
     return new Response(JSON.stringify({ products, debug }), { status: 200, headers: HEADERS });
