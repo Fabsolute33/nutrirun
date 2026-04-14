@@ -1,4 +1,4 @@
-import { HeartPulse, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { C } from "../constants";
 import { calcBMR } from "../utils";
 
@@ -10,12 +10,12 @@ export default function Header({ profil, onSignOut }) {
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
-      padding: "14px 16px",
+      padding: "12px 16px",
       background: C.surface,
       borderBottom: `1px solid ${C.border}`,
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <HeartPulse size={22} color={C.accent} />
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <img src="/logo.svg" alt="NutriRun" width={36} height={36} style={{ borderRadius: 10 }} />
         <span style={{ fontSize: 18, fontWeight: 900, color: C.text, letterSpacing: "-0.02em" }}>
           NutriRun
         </span>

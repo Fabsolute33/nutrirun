@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { HeartPulse, Mail, Lock, LogIn, UserPlus, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Mail, Lock, LogIn, UserPlus, AlertCircle, CheckCircle2 } from "lucide-react";
 import { C } from "../constants";
 
 export default function LoginScreen({ onSignIn, onSignUp }) {
@@ -58,14 +58,8 @@ export default function LoginScreen({ onSignIn, onSignUp }) {
 
         {/* Logo */}
         <div style={{ textAlign: "center" }}>
-          <div style={{
-            display: "inline-flex", alignItems: "center", justifyContent: "center",
-            width: 64, height: 64, borderRadius: 20,
-            background: C.accentBg, border: `1px solid ${C.accentBorder}`,
-            marginBottom: 12,
-          }}>
-            <HeartPulse size={32} color={C.accent} />
-          </div>
+          <img src="/logo.svg" alt="NutriRun" width={72} height={72}
+            style={{ borderRadius: 18, marginBottom: 12, boxShadow: "0 4px 16px rgba(22,163,74,0.25)" }} />
           <div style={{ fontSize: 28, fontWeight: 900, color: C.text, letterSpacing: "-0.03em" }}>NutriRun</div>
           <div style={{ fontSize: 14, color: C.muted, marginTop: 4 }}>
             Suivi nutrition & course à pied
