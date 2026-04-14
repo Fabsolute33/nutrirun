@@ -24,9 +24,8 @@ export function useFoodSearch() {
         const res  = await fetch(url, { signal: controller.signal });
         const data = await res.json();
 
-        // Le proxy retourne déjà { products: [{ id, name, brand, kcalPer100g }] }
+        if (data.error) setError(data.error);
         const parsed = (data.products || []).filter(p => p.kcalPer100g > 0 && p.name);
-
         setResults(parsed);
       } catch (e) {
         if (e.name !== "AbortError") setError("Recherche indisponible");
