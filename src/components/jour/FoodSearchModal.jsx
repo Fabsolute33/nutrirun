@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Search, X, ChevronLeft, Plus, Pencil, Loader, ScanBarcode } from "lucide-react";
+import { Search, X, ChevronLeft, Plus, Pencil, Loader, Barcode } from "lucide-react";
 import { C } from "../../constants";
 import { useFoodSearch } from "../../hooks/useFoodSearch";
 
@@ -15,6 +15,7 @@ export default function FoodSearchModal({ isOpen, mealName, onAdd, onClose }) {
   // Scanner
   const videoRef                          = useRef(null);
   const readerRef                         = useRef(null);
+  const scannedRef                        = useRef(false);
   const [scanError, setScanError]         = useState("");
   const [scanLoading, setScanLoading]     = useState(false);
 
@@ -51,25 +52,37 @@ export default function FoodSearchModal({ isOpen, mealName, onAdd, onClose }) {
 
       if (!videoRef.current) { setScanLoading(false); return; }
 
+      scannedRef.current = false;
       await reader.decodeFromVideoDevice(undefined, videoRef.current, async (result, err) => {
         if (!result) return;
-        const code = result.getText();
+        if (scannedRef.current) return;
+        scannedRef.current = true;
+        const code = result.getText().trim();
         stopScanner();
         setScanLoading(true);
 
+        // OFF référence en EAN-13 : si on lit un UPC-A (12 chiffres), on tente aussi avec un 0 en tête.
+        const candidates = code.length === 12 ? [code, "0" + code] : [code];
+
         try {
-          const res  = await fetch(`/api/barcode?code=${encodeURIComponent(code)}`);
-          const data = await res.json();
-          if (data.product) {
-            setSelected(data.product);
+          let product = null;
+          for (const c of candidates) {
+            const res  = await fetch(`/api/barcode?code=${encodeURIComponent(c)}`);
+            const data = await res.json().catch(() => ({}));
+            if (data?.product) { product = data.product; break; }
+          }
+
+          if (product) {
+            setSelected(product);
             setQty("100");
             setView("qty");
           } else {
-            setScanError(`Produit introuvable (${code})`);
+            setScanError(`Code-barres lu (${code}) mais produit non référencé. Cherche-le par nom ou ajoute-le manuellement.`);
+            setQuery(code);
             setView("search");
           }
         } catch {
-          setScanError("Erreur lors de la recherche du produit.");
+          setScanError(`Erreur réseau lors de la recherche (${code}).`);
           setView("search");
         } finally {
           setScanLoading(false);
@@ -87,6 +100,12 @@ export default function FoodSearchModal({ isOpen, mealName, onAdd, onClose }) {
   const stopScanner = () => {
     try { readerRef.current?.reset(); } catch {}
     readerRef.current = null;
+    // Coupe explicitement la piste vidéo : reset() de zxing 0.1.5 ne libère pas toujours la caméra.
+    const stream = videoRef.current?.srcObject;
+    if (stream && typeof stream.getTracks === "function") {
+      stream.getTracks().forEach(t => t.stop());
+      videoRef.current.srcObject = null;
+    }
   };
 
   const preview = selected
@@ -113,7 +132,11 @@ export default function FoodSearchModal({ isOpen, mealName, onAdd, onClose }) {
   };
 
   const handleBack = () => {
-    if (view === "scanner") stopScanner();
+    if (view === "scanner") {
+      stopScanner();
+      setScanError("");
+      scannedRef.current = false;
+    }
     setView("search");
   };
 
@@ -234,7 +257,7 @@ export default function FoodSearchModal({ isOpen, mealName, onAdd, onClose }) {
                 >
                   {scanLoading
                     ? <Loader size={18} color={C.accent} />
-                    : <ScanBarcode size={20} color={C.accent} />
+                    : <Barcode size={20} color={C.accent} />
                   }
                 </button>
               </div>
